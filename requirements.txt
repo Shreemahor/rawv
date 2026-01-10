@@ -1,0 +1,19 @@
+# core
+
+mcp
+chainlit>=1.0.0
+langchain>=0.2.0
+langgraph>=0.2.0
+grandalf
+langchain-groq>=0.1.0
+groq>=0.5.0
+langchain-ollama
+
+# web research
+
+firecrawl-py
+
+# voice
+
+edge-tts>=7.0.0
+transformers>=4.40.0

@@ -1,0 +1,11 @@
+# General Python
+__pycache__/
+*.pyc
+
+# Virtual Environment
+.venv/
+venv/
+
+# Chainlit
+.chainlit/
+.files/
