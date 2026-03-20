@@ -1,4 +1,14 @@
-# Rawv
+---
+title: RAWV
+emoji: "🔬"
+colorFrom: blue
+colorTo: gray
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
+## Rawv
 
 ***Research AI With Voice***
 
