@@ -310,6 +310,50 @@ async def _respond_with_voice(engine: ResearchEngine, chat_model: ChatGroq, user
         await cl.Message(content=f"(TTS skipped) {e}").send()
 
 
+async def _ensure_settings_ui() -> None:
+    if bool(cl.user_session.get("settings_initialized")):
+        return
+
+    force_research = bool(cl.user_session.get("force_research"))
+    await cl.ChatSettings(
+        [
+            Switch(
+                id="force_research",
+                label="RESEARCH MODE (FORCE ON)",
+                initial=force_research,
+                description="When ON, RAWV researches most non-smalltalk queries.",
+            )
+        ]
+    ).send()
+    cl.user_session.set("settings_initialized", True)
+
+
+@cl.set_starters
+async def set_starters(_current_user, _language):
+    return [
+        cl.Starter(
+            label="Start Chat",
+            message="start",
+            icon="/public/rawv-avatar-favicon.png",
+        ),
+        cl.Starter(
+            label="Enable Research Mode",
+            message="research on",
+            icon="/public/rawv-avatar-favicon.png",
+        ),
+        cl.Starter(
+            label="Disable Research Mode",
+            message="research off",
+            icon="/public/rawv-avatar-favicon.png",
+        ),
+        cl.Starter(
+            label="Quick Research Example",
+            message="quick research on latest AI browser automation trends",
+            icon="/public/rawv-avatar-favicon.png",
+        ),
+    ]
+
+
 @cl.on_chat_start
 async def on_chat_start():
     cl.user_session.set("audio_buffer", bytearray())
@@ -318,28 +362,7 @@ async def on_chat_start():
     cl.user_session.set("research_engine", ResearchEngine())
     cl.user_session.set("chat_model", ChatGroq(model=GROQ_CHAT_MODEL, temperature=0.3))
     cl.user_session.set("force_research", False)
-
-    await cl.ChatSettings(
-        [
-            Switch(
-                id="force_research",
-                label="RESEARCH MODE (FORCE ON)",
-                initial=False,
-                description="When ON, RAWV researches most non-smalltalk queries.",
-            )
-        ]
-    ).send()
-
-    await cl.Message(
-        content=(
-            "🔬 RESEARCH AGENT CONTROL\n"
-            "Use the switch in settings, or tap a button below."
-        ),
-        actions=[
-            cl.Action(name="research_on", label="🔬 TURN RESEARCH ON", payload={"enabled": True}),
-            cl.Action(name="research_off", label="⚡ TURN RESEARCH OFF", payload={"enabled": False}),
-        ],
-    ).send()
+    cl.user_session.set("settings_initialized", False)
 
 
 @cl.on_settings_update
@@ -374,15 +397,28 @@ async def on_message(message: cl.Message):
         cl.user_session.set("chat_model", chat_model)
 
     message_text = message.content.strip()
+    if message_text.lower() in {"start", "/start"}:
+        await _ensure_settings_ui()
+        await cl.Message(
+            content=(
+                "RAWV is ready. Ask anything, or say 'quick research on ...' for sourced web research. "
+                "You can toggle research mode in settings anytime."
+            )
+        ).send()
+        return
+
     if message_text.lower() in {"/research on", "research on"}:
         cl.user_session.set("force_research", True)
+        await _ensure_settings_ui()
         await cl.Message(content="Research mode is now ON.").send()
         return
     if message_text.lower() in {"/research off", "research off"}:
         cl.user_session.set("force_research", False)
+        await _ensure_settings_ui()
         await cl.Message(content="Research mode is now OFF.").send()
         return
 
+    await _ensure_settings_ui()
     await _respond_with_voice(engine, chat_model, message.content)
 
 
