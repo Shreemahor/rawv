@@ -6,3 +6,6 @@ __pycache__/
 .venv/
 venv/
 
+# Chainlit generated/local artifacts (keep .chainlit/config.toml tracked)
+.chainlit/translations/
+.files/
