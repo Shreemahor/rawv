@@ -1,0 +1,145 @@
+:root {
+  --rawv-silver-50: #f6f8fb;
+  --rawv-silver-100: #eef2f7;
+  --rawv-silver-200: #dde4ee;
+  --rawv-silver-400: #a8b4c7;
+  --rawv-silver-700: #5e6a80;
+  --rawv-blue-100: #d9f0ff;
+  --rawv-blue-200: #b8e3ff;
+  --rawv-blue-300: #87ccff;
+  --rawv-blue-500: #3aa5f4;
+  --rawv-blue-700: #1f6da6;
+  --rawv-text-900: #0f2234;
+  --rawv-text-700: #274057;
+  --rawv-white: #ffffff;
+}
+
+body {
+  background: linear-gradient(145deg, var(--rawv-silver-50) 0%, var(--rawv-blue-100) 45%, #ffffff 100%);
+  color: var(--rawv-text-900) !important;
+}
+
+#root {
+  background: radial-gradient(circle at 10% 5%, rgba(184, 227, 255, 0.45), transparent 38%);
+  color: var(--rawv-text-900) !important;
+}
+
+* {
+  color: inherit;
+}
+
+/* Header + branding */
+header {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.94), rgba(217, 240, 255, 0.92));
+  border-bottom: 1px solid var(--rawv-silver-200);
+  backdrop-filter: blur(8px);
+}
+
+header * {
+  color: var(--rawv-text-900) !important;
+}
+
+/* Message cards */
+[data-testid="message"] {
+  border: 1px solid rgba(168, 180, 199, 0.35);
+  border-radius: 16px;
+  box-shadow: 0 8px 20px rgba(31, 109, 166, 0.08);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+[data-testid="message"] * {
+  color: var(--rawv-text-900) !important;
+}
+
+/* Inputs */
+textarea,
+input {
+  border: 1px solid var(--rawv-silver-200) !important;
+  background: #ffffff !important;
+  color: var(--rawv-text-900) !important;
+  caret-color: var(--rawv-blue-700) !important;
+  font-weight: 600;
+}
+
+textarea:focus,
+input:focus {
+  border-color: var(--rawv-blue-500) !important;
+  box-shadow: 0 0 0 3px rgba(58, 165, 244, 0.2) !important;
+}
+
+textarea::placeholder,
+input::placeholder {
+  color: var(--rawv-silver-700) !important;
+  opacity: 1;
+}
+
+/* Highly visible research controls */
+button,
+[role="button"] {
+  border-radius: 14px !important;
+  min-height: 42px !important;
+  padding: 10px 16px !important;
+  border: 1px solid rgba(58, 165, 244, 0.55) !important;
+  background: linear-gradient(180deg, #e8f6ff, #ccecff) !important;
+  color: #08314f !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.02em;
+  box-shadow: 0 6px 14px rgba(58, 165, 244, 0.2) !important;
+  transition: transform 120ms ease, box-shadow 120ms ease, filter 120ms ease;
+}
+
+button:hover,
+[role="button"]:hover {
+  transform: translateY(-1px);
+  filter: saturate(1.08);
+  box-shadow: 0 10px 20px rgba(58, 165, 244, 0.3) !important;
+}
+
+button:active,
+[role="button"]:active {
+  transform: translateY(0);
+  box-shadow: 0 6px 12px rgba(58, 165, 244, 0.2) !important;
+}
+
+/* Fallback for action buttons area */
+[data-testid="message-actions"] button {
+  background: linear-gradient(90deg, #bde7ff, #86ccff) !important;
+  color: #07263d !important;
+  border: 2px solid #ffffff !important;
+  font-weight: 900 !important;
+  min-height: 46px !important;
+  box-shadow: 0 0 0 2px rgba(58, 165, 244, 0.35), 0 12px 24px rgba(31, 109, 166, 0.35) !important;
+}
+
+/* Settings panel buttons and delayed controls */
+[data-testid*="settings"] button,
+[aria-label*="settings"] button,
+[role="dialog"] button {
+  color: #08314f !important;
+  background: linear-gradient(180deg, #eff9ff, #caebff) !important;
+  border: 1px solid #8ecfff !important;
+  box-shadow: 0 8px 16px rgba(58, 165, 244, 0.2) !important;
+}
+
+/* Toggle/switch readability */
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--rawv-blue-500);
+}
+
+label,
+legend,
+small,
+[role="dialog"] * {
+  color: var(--rawv-text-900) !important;
+}
+
+/* Sidebar */
+aside {
+  background: linear-gradient(180deg, rgba(246, 248, 251, 0.95), rgba(217, 240, 255, 0.7));
+  border-right: 1px solid var(--rawv-silver-200);
+}
+
+aside * {
+  color: var(--rawv-text-700) !important;
+}
