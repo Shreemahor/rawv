@@ -346,11 +346,6 @@ async def set_starters(_current_user, _language):
             message="research off",
             icon="/public/rawv-avatar-favicon.png",
         ),
-        cl.Starter(
-            label="Quick Research Example",
-            message="quick research on latest AI browser automation trends",
-            icon="/public/rawv-avatar-favicon.png",
-        ),
     ]
 
 
