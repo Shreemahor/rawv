@@ -12,8 +12,13 @@ langchain-ollama
 # web research
 
 firecrawl-py
+ddgs>=9.0.0
 
 # voice
 
 edge-tts>=7.0.0
 transformers>=4.40.0
+
+# parsing
+
+beautifulsoup4>=4.12.0

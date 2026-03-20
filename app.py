@@ -1,21 +1,21 @@
 # core
 from groq import Groq
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.runnables import Runnable
-from langchain_core.runnables import RunnableConfig
-from langchain_groq import ChatGroq
 
 # other dauflt library imports
 import asyncio
 import io
 import os
+import re
 import wave
-from typing import Optional, cast
+from typing import Optional
 
 # specfics 
 import chainlit as cl
 import edge_tts
+from chainlit.input_widget import Switch
+from langchain_groq import ChatGroq
+from rawv.research import ResearchEngine
+from rawv.research.models import ResearchMode
 
 
 WHISPER_MODEL = os.getenv("RAWV_WHISPER_MODEL", "whisper-large-v3-turbo")
@@ -121,46 +121,191 @@ def transcribe_bytes(audio_bytes: bytes, mime_type: Optional[str] = None) -> tup
         model=WHISPER_MODEL,
         response_format="text",
     )
+    transcript_text = str(transcription)
     debug = (
         f"file={filename} ext={ext} in_bytes={len(audio_bytes)} out_bytes={len(normalized_bytes)} "
         f"mime_type={(mime_type or '(unknown)')}"
     )
-    return transcription, debug
+    return transcript_text, debug
 
 
 async def synthesize_mp3_bytes(text: str) -> bytes:
     communicate = edge_tts.Communicate(text=text, voice=TTS_VOICE, rate=TTS_RATE)
     audio = bytearray()
     async for chunk in communicate.stream():
-        if chunk.get("type") == "audio":
-            audio.extend(chunk["data"])
+        data = chunk.get("data")
+        if chunk.get("type") == "audio" and isinstance(data, (bytes, bytearray)):
+            audio.extend(data)
     return bytes(audio)
 
 
-async def _respond_with_voice(runnable: Runnable, user_text: str) -> None:
-    msg = cl.Message(content="")
-    async for chunk in runnable.astream(
-        {"question": user_text},
-        config=RunnableConfig(callbacks=[cl.LangchainCallbackHandler()]),
-    ):
-        await msg.stream_token(chunk)
+def _parse_mode_and_query(text: str) -> tuple[ResearchMode, str]:
+    lowered = text.strip().lower()
+    if lowered.startswith("quick research on "):
+        return "quick", text[len("quick research on ") :].strip()
+    if lowered.startswith("deep research on "):
+        return "deep", text[len("deep research on ") :].strip()
+    if lowered.startswith("normal research on "):
+        return "normal", text[len("normal research on ") :].strip()
+    default_mode = os.getenv("RAWV_RESEARCH_DEFAULT_MODE", "normal").strip().lower()
+    if default_mode == "quick":
+        return "quick", text
+    if default_mode == "deep":
+        return "deep", text
+    if default_mode == "normal":
+        return "normal", text
+    return "normal", text
 
+
+def _render_sources(sources) -> str:
+    if not sources:
+        return "Sources: none (fallback response)"
+    lines = ["Sources:"]
+    for i, source in enumerate(sources, start=1):
+        lines.append(f"[{i}] {source.title} - {source.url}")
+    return "\n".join(lines)
+
+
+def _is_smalltalk(text: str) -> bool:
+    normalized = re.sub(r"\s+", " ", text.strip().lower())
+    smalltalk_patterns = [
+        r"^hi$",
+        r"^hello$",
+        r"^hey$",
+        r"^yo$",
+        r"^sup$",
+        r"^how are you( doing)?\??$",
+        r"^what'?s up\??$",
+        r"^good (morning|afternoon|evening)$",
+        r"^thanks!?$",
+        r"^thank you!?$",
+    ]
+    return any(re.match(pattern, normalized) for pattern in smalltalk_patterns)
+
+
+def _needs_research(text: str, force_research: bool) -> bool:
+    if not text.strip():
+        return False
+
+    lower = text.lower().strip()
+    explicit_research_request = (
+        lower.startswith("quick research on ")
+        or lower.startswith("normal research on ")
+        or lower.startswith("deep research on ")
+        or "research" in lower
+        or "look up" in lower
+        or "find sources" in lower
+    )
+    if explicit_research_request:
+        return True
+
+    if _is_smalltalk(text):
+        return False
+
+    research_signal_words = [
+        "latest",
+        "today",
+        "news",
+        "trend",
+        "compare",
+        "analysis",
+        "cite",
+        "evidence",
+        "source",
+        "what is",
+        "who is",
+        "when did",
+        "why does",
+        "how to",
+    ]
+    has_research_signal = any(word in lower for word in research_signal_words)
+    looks_like_question = "?" in lower or len(lower.split()) >= 8
+
+    if force_research and not _is_smalltalk(text):
+        return True
+
+    return has_research_signal and looks_like_question
+
+
+def _build_voice_reply(answer: str) -> str:
+    clean = " ".join(answer.split())
+    if len(clean) <= 280:
+        return clean
+    return clean[:277] + "..."
+
+
+async def _run_chat_reply(chat_model: ChatGroq, user_text: str) -> str:
+    def _invoke() -> str:
+        system = (
+            "You are RAWV, a friendly voice-first assistant. "
+            "For casual chat, keep it brief and natural (1-2 sentences)."
+        )
+        response = chat_model.invoke(
+            [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user_text},
+            ]
+        )
+        content = response.content
+        if isinstance(content, str):
+            return content.strip()
+        return str(content).strip()
+
+    return await asyncio.to_thread(_invoke)
+
+
+async def _respond_with_voice(engine: ResearchEngine, chat_model: ChatGroq, user_text: str) -> None:
+    mode, query = _parse_mode_and_query(user_text)
+    if not query:
+        await cl.Message(content="Please ask a question after the mode command.").send()
+        return
+
+    force_research = bool(cl.user_session.get("force_research"))
+    use_research = _needs_research(query, force_research)
+
+    if not use_research:
+        reply = await _run_chat_reply(chat_model, query)
+        await cl.Message(content=reply).send()
+        try:
+            audio_bytes = await synthesize_mp3_bytes(_build_voice_reply(reply))
+            await cl.Message(
+                content="",
+                elements=[
+                    cl.Audio(
+                        content=audio_bytes,
+                        name="reply.mp3",
+                        display="inline",
+                        auto_play=True,
+                    )
+                ],
+            ).send()
+        except Exception as e:
+            await cl.Message(content=f"(TTS skipped) {e}").send()
+        return
+
+    result = await asyncio.to_thread(engine.run, query, mode)
+
+    for step in result.steps:
+        with cl.Step(type="tool", name=step.name) as ui_step:
+            ui_step.output = step.output
+
+    final_text = f"{result.answer}\n\n{_render_sources(result.sources)}"
+    msg = cl.Message(content=final_text)
     await msg.send()
 
     try:
-        audio_bytes = await synthesize_mp3_bytes(msg.content)
-        msg.elements = [
-            cl.Audio(
-                content=audio_bytes,
-                name="reply.mp3",
-                display="inline",
-                auto_play=True,
-            )
-        ]
-        if hasattr(msg, "update"):
-            await msg.update()
-        else:
-            await cl.Message(content="", elements=msg.elements).send()
+        audio_bytes = await synthesize_mp3_bytes(result.spoken_summary)
+        await cl.Message(
+            content="",
+            elements=[
+                cl.Audio(
+                    content=audio_bytes,
+                    name="reply.mp3",
+                    display="inline",
+                    auto_play=True,
+                )
+            ],
+        ).send()
     except Exception as e:
         await cl.Message(content=f"(TTS skipped) {e}").send()
 
@@ -170,25 +315,75 @@ async def on_chat_start():
     cl.user_session.set("audio_buffer", bytearray())
     cl.user_session.set("audio_mime_type", None)
     cl.user_session.set("voice_task", None)
+    cl.user_session.set("research_engine", ResearchEngine())
+    cl.user_session.set("chat_model", ChatGroq(model=GROQ_CHAT_MODEL, temperature=0.3))
+    cl.user_session.set("force_research", False)
 
-    model = ChatGroq(model=GROQ_CHAT_MODEL, streaming=True)
-    prompt = ChatPromptTemplate.from_messages(
+    await cl.ChatSettings(
         [
-            (
-                "system",
-                "You are RAWV, a helpful voice-first assistant. Reply like a real person in a conversational tone. Keep responses short (1-2 sentences by default) and easy to speak aloud. Ask one clarifying question if needed. Avoid long lists unless the user explicitly asks for them.",
-            ),
-            ("human", "{question}"),
+            Switch(
+                id="force_research",
+                label="RESEARCH MODE (FORCE ON)",
+                initial=False,
+                description="When ON, RAWV researches most non-smalltalk queries.",
+            )
         ]
-    )
-    runnable = prompt | model | StrOutputParser()
-    cl.user_session.set("runnable", runnable)
+    ).send()
+
+    await cl.Message(
+        content=(
+            "🔬 RESEARCH AGENT CONTROL\n"
+            "Use the switch in settings, or tap a button below."
+        ),
+        actions=[
+            cl.Action(name="research_on", label="🔬 TURN RESEARCH ON", payload={"enabled": True}),
+            cl.Action(name="research_off", label="⚡ TURN RESEARCH OFF", payload={"enabled": False}),
+        ],
+    ).send()
+
+
+@cl.on_settings_update
+async def on_settings_update(settings):
+    enabled = bool(settings.get("force_research", False))
+    cl.user_session.set("force_research", enabled)
+    status = "ON" if enabled else "OFF"
+    await cl.Message(content=f"Research mode is now {status}.").send()
+
+
+@cl.action_callback("research_on")
+async def on_research_on(_action: cl.Action):
+    cl.user_session.set("force_research", True)
+    await cl.Message(content="Research mode is now ON.").send()
+
+
+@cl.action_callback("research_off")
+async def on_research_off(_action: cl.Action):
+    cl.user_session.set("force_research", False)
+    await cl.Message(content="Research mode is now OFF.").send()
 
 
 @cl.on_message
 async def on_message(message: cl.Message):
-    runnable = cast(Runnable, cl.user_session.get("runnable"))  # type: Runnable
-    await _respond_with_voice(runnable, message.content)
+    engine = cl.user_session.get("research_engine")
+    if engine is None:
+        engine = ResearchEngine()
+        cl.user_session.set("research_engine", engine)
+    chat_model = cl.user_session.get("chat_model")
+    if chat_model is None:
+        chat_model = ChatGroq(model=GROQ_CHAT_MODEL, temperature=0.3)
+        cl.user_session.set("chat_model", chat_model)
+
+    message_text = message.content.strip()
+    if message_text.lower() in {"/research on", "research on"}:
+        cl.user_session.set("force_research", True)
+        await cl.Message(content="Research mode is now ON.").send()
+        return
+    if message_text.lower() in {"/research off", "research off"}:
+        cl.user_session.set("force_research", False)
+        await cl.Message(content="Research mode is now OFF.").send()
+        return
+
+    await _respond_with_voice(engine, chat_model, message.content)
 
 
 # Lots of audio helpers because chainlit and groq audios are not directly compatible.
@@ -246,7 +441,14 @@ async def on_audio_end():
         previous_task.cancel()
 
     async def _process() -> None:
-        runnable = cast(Runnable, cl.user_session.get("runnable"))  # type: Runnable
+        engine = cl.user_session.get("research_engine")
+        if engine is None:
+            engine = ResearchEngine()
+            cl.user_session.set("research_engine", engine)
+        chat_model = cl.user_session.get("chat_model")
+        if chat_model is None:
+            chat_model = ChatGroq(model=GROQ_CHAT_MODEL, temperature=0.3)
+            cl.user_session.set("chat_model", chat_model)
 
         with cl.Step(type="tool", name="🎙️ Transcribing") as step:
             try:
@@ -265,7 +467,7 @@ async def on_audio_end():
         with cl.Step(type="tool", name="🧾 Audio debug") as step:
             step.output = debug
 
-        await _respond_with_voice(runnable, transcript)
+        await _respond_with_voice(engine, chat_model, transcript)
 
     task = asyncio.create_task(_process())
     cl.user_session.set("voice_task", task)
