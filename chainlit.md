@@ -1,6 +1,6 @@
-# Welcome to RAWV
+# Rawv'
 
-RAWV is your voice-first research agent.
+Voice-first research agent.
 
 ## What RAWV Does
 

@@ -143,3 +143,21 @@ aside {
 aside * {
   color: var(--rawv-text-700) !important;
 }
+
+/* Home title styling */
+h1 {
+  font-size: clamp(2.2rem, 5.2vw, 3.8rem) !important;
+  line-height: 1.02 !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.02em;
+  margin-bottom: 0.35rem !important;
+  color: #0a2a44 !important;
+  text-shadow: 0 3px 0 rgba(255, 255, 255, 0.92), 0 10px 22px rgba(58, 165, 244, 0.22);
+}
+
+h1 + p {
+  font-size: 1.02rem;
+  font-weight: 600;
+  color: #31506a !important;
+  margin-bottom: 1.2rem !important;
+}
