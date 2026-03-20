@@ -10,6 +10,8 @@ pinned: false
 
 ## Rawv
 
+[text](https://huggingface.co/spaces/Shreemahor/Rawv)
+
 ***Research AI With Voice***
 
 ## Features
@@ -45,9 +47,13 @@ All Python
 
 ## Models
 
-Speech - *Orpheus English*
-Audio - *Edge TTS*
-Brain - *GPT-OSS 120B*
+Speech (TTS) - *en-US-AriaNeural*
+Audio Input (STT) - *whisper-large-v3-turbo*
+Brain (Core) - *llama-3.1-8b-instant*
+
+## AI Usage
+
+I made the base backend but then I ran into very tricky audio errors when trying to get a response back, so I got help from copilot.
 
 ## Future
 
