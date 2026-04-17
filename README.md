@@ -1,6 +1,6 @@
 # Rawv
 
-#### [Try it Here]([https://shree.hackclub.app])
+#### [Try it Here](https://shree.hackclub.app)
 ### Research AI With Voice
 <img width="841" height="487" alt="home" src="https://github.com/user-attachments/assets/5e88c26b-6922-4600-b312-9304cd4adaf8" />
 
